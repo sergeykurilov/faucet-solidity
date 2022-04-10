@@ -1,0 +1,1 @@
+web3: is collection of libs that allow you to interact with a local or remote ethereum code
