@@ -5,39 +5,38 @@ import {useCallback, useEffect, useState} from "react";
 import {loadContract} from "./utils/loadContract";
 
 function App() {
-    const [account, setAccount] = useState(null);
     const [web3Api, setWeb3Api] = useState({
         provider: null,
+        isProviderLoaded: false,
         web3: null,
         contract: null,
     });
+    const [account, setAccount] = useState(null);
     const [shouldReload, reload] = useState(false);
     const reloadEffect = useCallback(() => reload(!shouldReload), [shouldReload]);
     const [balance, setBalance] = useState(null);
+    const canConnectToContract = account && web3Api.contract;
+
 
     const setAccountListener = (provider) => {
         provider.on("accountsChanged",
                 _ => window.location.reload());
-
-        // provider._jsonRpcConnection.events.on("notification", (notification) => {
-        //     if (notification.method === "metamask_unlockStateChanged") {
-        //         setAccount(null);
-        //     }
-        // });
     }
 
     useEffect(() => {
         const loadProvider = async () => {
             let provider = await detectEthereumProvider();
-            const contract = await loadContract("Faucet", provider);
             if(provider) {
+                const contract = await loadContract("Faucet", provider);
                 setAccountListener(provider);
                 setWeb3Api({
                     web3: new Web3(provider),
                     provider,
                     contract,
+                    isProviderLoaded: true,
                 });
             } else {
+                setWeb3Api(api => ({ ...api, isProviderLoaded: true}));
                 console.error('Please install metamask')
             }
         };
@@ -84,24 +83,38 @@ function App() {
     <>
       <div className={'faucet-wrapper'}>
         <div className={'faucet'}>
-            <div className={'is-flex is-align-items-center'}>
+            { web3Api.isProviderLoaded ?
+                <div className={'is-flex is-align-items-center'}>
             <span>
                 <strong className={'mr-2'}>Account:</strong>
             </span>
-           {account ? (<div>{account}</div>) : (
-                <button
-                    onClick={() =>
-                        web3Api.provider.request({method: 'eth_requestAccounts'})}
-                    className={'button is-small'}>Connect Wallet</button>
-            )}</div>
+                    {account ? (<div>{account}</div>) :
+                        !web3Api.provider ? <>
+                            <div className={'notification is-warning is- is-size-6 is-rounded'}>
+                                Wallet is not detected. {' '}
+                                <a className={'is-block'}
+                                   rel={'noreferrer'}
+                                   target="_blank"
+                                   href="https://docs.metamask.io">Install Metamask</a>
+                            </div>
+                        </> : (
+                            <button
+                                onClick={() =>
+                                    web3Api.provider.request({method: 'eth_requestAccounts'})}
+                                className={'button is-small'}>Connect Wallet</button>
+                        )}</div>
+                :  <span>Looking for Web3....</span>
+            }
+
             <div className={'balance-view is-size-2 my-4'}>
                 Current balance: <strong>{balance}</strong> ETH
             </div>
+            {!canConnectToContract && <i className={'is-block'}>Connect to Ganache</i>}
             <button
-                disabled={!account}
+                disabled={!canConnectToContract}
                 onClick={addFunds} className={'button is-link mr-2'}>Donate 1eth</button>
             <button
-                disabled={!account}
+                disabled={!canConnectToContract}
                 onClick={withDrawFunds}
                 className={'button is-primary'}>Withdraw</button>
         </div>
